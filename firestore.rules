@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function userData() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function role() { return userData().role; }
+    function isAdmin() { return signedIn() && role() == 'admin'; }
+    function isTeacher() { return signedIn() && role() == 'teacher'; }
+    function isStudent() { return signedIn() && role() == 'student'; }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin() || isTeacher());
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+        || (request.auth.uid == uid
+            && request.resource.data.role == resource.data.role
+            && request.resource.data.classId == resource.data.classId);
+    }
+
+    match /classes/{id}  { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /courses/{id}  { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /offerings/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+      match /slots/{slotId} { allow read: if signedIn(); allow write: if isAdmin(); }
+    }
+
+    match /assignments/{assignmentId} {
+      allow read: if signedIn();
+      allow create: if isTeacher() && request.resource.data.teacherId == request.auth.uid;
+      allow update, delete: if isTeacher() && resource.data.teacherId == request.auth.uid;
+
+      match /submissions/{studentUid} {
+        function a() { return get(/databases/$(database)/documents/assignments/$(assignmentId)).data; }
+
+        function windowOpen() {
+          return request.time < a().dueAt
+            || (a().latePolicy == 'allowLate'
+                && (!('lateUntil' in a()) || a().lateUntil == null || request.time < a().lateUntil));
+        }
+
+        function lateFlagCorrect() {
+          return request.resource.data.isLate == (request.time >= a().dueAt);
+        }
+
+        allow read: if signedIn() && (request.auth.uid == studentUid || isTeacher());
+
+        allow create: if isStudent()
+          && request.auth.uid == studentUid
+          && request.resource.data.submittedAt == request.time
+          && windowOpen()
+          && lateFlagCorrect()
+          && !('score' in request.resource.data);
+
+        // öğrenci tekrar teslim (güncelleme) — pencere hâlâ açıksa
+        allow update: if (isStudent()
+            && request.auth.uid == studentUid
+            && request.resource.data.submittedAt == request.time
+            && windowOpen()
+            && lateFlagCorrect()
+            && request.resource.data.get('score', null) == resource.data.get('score', null))
+          || isTeacher();
+      }
+    }
+
+    match /exams/{id} {
+      allow read: if signedIn();
+      allow write: if isTeacher();
+      match /grades/{studentUid} {
+        allow read: if signedIn() && (request.auth.uid == studentUid || isTeacher());
+        allow write: if isTeacher();
+      }
+    }
+
+    match /attendance/{docId}/records/{studentUid} {
+      allow read: if signedIn() && (request.auth.uid == studentUid || isTeacher());
+      allow write: if isTeacher();
+    }
+
+    match /announcements/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin() || isTeacher();
+    }
+  }
+}
+
