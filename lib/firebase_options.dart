@@ -19,6 +19,9 @@ class DefaultFirebaseOptions {
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
+        return macos;
       default:
         return android;
     }
@@ -26,10 +29,20 @@ class DefaultFirebaseOptions {
 
   /// Android platformu için Firebase kimlik bilgileri
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyPlaceholderEduTrackKey',
+    apiKey: 'AIzaSyD00000000000000000000000000000000',
     appId: '1:1234567890:android:edutrackplaceholder',
     messagingSenderId: '1234567890',
     projectId: 'edutrack-app',
     storageBucket: 'edutrack-app.appspot.com',
+  );
+
+  /// macOS & iOS platformu için Firebase kimlik bilgileri (Placeholder)
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyD00000000000000000000000000000000',
+    appId: '1:123456789012:ios:abcdef1234567890abcdef',
+    messagingSenderId: '123456789012',
+    projectId: 'edutrack-app',
+    storageBucket: 'edutrack-app.appspot.com',
+    iosBundleId: 'com.fahri.edutrackApp',
   );
 }
